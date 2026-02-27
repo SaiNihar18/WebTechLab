@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Taxmann's Tax Calculator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+  body { background: #f0f0f0; display: flex; justify-content: center; padding: 30px; }
+  .card { width: 580px; border: 1px solid #bbb; background: #fff; box-shadow: 2px 2px 8px rgba(0,0,0,0.2); }
+
+  /* Header */
+  .header { background: #b22222; color: #fff; text-align: center;
+            padding: 10px; font-size: 22px; font-weight: bold; letter-spacing: 3px; }
+
+  /* Tabs */
+  .tabs { display: flex; background: #2a2a2a; }
+  .tab { flex: 1; padding: 10px; text-align: center; color: #999; cursor: pointer;
+         font-size: 12px; font-weight: bold; border-bottom: 3px solid transparent; }
+  .tab.active { color: #fff; border-bottom: 3px solid #b22222; background: #111; }
+
+  /* Form */
+  .form-section { background: #1c1c1c; padding: 14px 18px; }
+  .form-row { display: flex; align-items: center; margin-bottom: 9px; }
+  .step-lbl { color: #ccc; font-size: 12px; width: 55px; flex-shrink: 0; }
+  .field-lbl { color: #ddd; font-size: 12px; flex: 1; }
+  select, input[type="number"] {
+    width: 175px; padding: 5px 8px; font-size: 12px;
+    border: 1px solid #666; background: #f8f8f8; border-radius: 2px; outline: none;
+  }
+  select:focus, input:focus { border-color: #b22222; }
+
+  /* Result Section */
+  .result-header { background: #b22222; color: #fff; text-align: center;
+                   padding: 8px; font-size: 13px; font-weight: bold; letter-spacing: 2px; }
+  .result-section { background: #1c1c1c; padding: 14px 18px; }
+  .result-row { display: flex; align-items: center; margin-bottom: 9px; }
+  .bullet { width: 20px; height: 20px; background: #b22222; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 9px; margin-right: 10px; flex-shrink: 0; }
+  .result-lbl { color: #ddd; font-size: 12px; flex: 1; }
+  .result-box { width: 175px; padding: 5px 8px; font-size: 12px;
+                border: 1px solid #666; background: #f0f0f0; border-radius: 2px;
+                color: #222; font-weight: bold; }
+
+  /* Footer */
+  .footer-bar { display: flex; justify-content: space-between; align-items: center;
+                background: #1c1c1c; padding: 10px 18px; }
+  .btn-reset { background: #b22222; color: #fff; border: none; padding: 6px 16px;
+               font-size: 12px; border-radius: 3px; cursor: pointer; }
+  .btn-reset:hover { background: #8b0000; }
+  .finance-note { color: #aaa; font-size: 11px; }
+  .support { background: #ececec; text-align: center; padding: 8px; font-size: 11px; color: #666; }
+  .support a { color: #b22222; text-decoration: none; }
+  .error { color: #ff6b6b; font-size: 11px; padding: 4px 18px 0; background: #1c1c1c; display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="header">TAXMANN'S</div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab(this)">🖩 &nbsp;TAX CALCULATOR</div>
+    <div class="tab" onclick="switchTab(this)">🖩 &nbsp;INCOME &amp; TAX CALCULATOR</div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-row">
+      <span class="step-lbl">Step 1 :</span>
+      <span class="field-lbl">Assessment Year</span>
+      <select id="ayear" onchange="calculate()">
+        <option value="2020-21">2020-21</option>
+        <option value="2021-22">2021-22</option>
+        <option value="2022-23">2022-23</option>
+        <option value="2023-24">2023-24</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <span class="step-lbl">Step 2 :</span>
+      <span class="field-lbl">Tax Payer</span>
+      <select id="taxpayer" onchange="calculate()">
+        <option value="Individual">Individual</option>
+        <option value="HUF">HUF</option>
+        <option value="Firm">Firm / LLP</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <span class="step-lbl">Step 3 :</span>
+      <span class="field-lbl">Male / Female / Senior Citizen</span>
+      <select id="gender" onchange="calculate()">
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Senior">Senior Citizen (60–80)</option>
+        <option value="SuperSenior">Super Senior Citizen (80+)</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <span class="step-lbl">Step 4 :</span>
+      <span class="field-lbl">Residential Status</span>
+      <select id="resstatus" onchange="calculate()">
+        <option value="Resident">Resident</option>
+        <option value="NRI">Non-Resident (NRI)</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <span class="step-lbl">Step 5 :</span>
+      <span class="field-lbl">Net Taxable Income (₹)</span>
+      <input type="number" id="income" min="0" placeholder="e.g. 750000" oninput="calculate()">
+    </div>
+  </div>
+
+  <div id="errMsg" class="error">⚠ Please enter a valid positive income amount.</div>
+
+  <div class="result-header">YOUR TAX COMPUTATION</div>
+
+  <div class="result-section">
+    <div class="result-row">
+      <div class="bullet">▶</div>
+      <span class="result-lbl">Income Tax</span>
+      <input class="result-box" id="outTax" readonly placeholder="–">
+    </div>
+    <div class="result-row">
+      <div class="bullet">▶</div>
+      <span class="result-lbl">Surcharge</span>
+      <input class="result-box" id="outSurcharge" readonly placeholder="–">
+    </div>
+    <div class="result-row">
+      <div class="bullet">▶</div>
+      <span class="result-lbl">Health and Education Cess @ 4%</span>
+      <input class="result-box" id="outCess" readonly placeholder="–">
+    </div>
+    <div class="result-row">
+      <div class="bullet">▶</div>
+      <span class="result-lbl">Total Tax Liability</span>
+      <input class="result-box" id="outTotal" readonly placeholder="–">
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <button class="btn-reset" onclick="resetAll()">↺ &nbsp;Reset</button>
+    <span class="finance-note">As per Finance (No. 2) Bill, 2019</span>
+  </div>
+  <div class="support">Supported by <a href="https://www.taxmann.com" target="_blank">www.taxmann.com</a></div>
+</div>
+
+<script>
+  /*
+   * INCOME TAX CALCULATOR — AY 2020-21 (Finance No.2 Bill, 2019)
+   * Covers: Individual, HUF, Firm/LLP | Resident & NRI
+   * Features: Correct slabs, Rebate u/s 87A, Surcharge with Marginal Relief, 4% Cess
+   */
+
+  /* ── 1. Slab-based tax for Individual / HUF ─────────────────────────────── */
+  function slabTax(income, gender) {
+    switch (gender) {
+      case "SuperSenior":
+        // Exempt up to ₹5,00,000 | 5L–10L @20% | >10L @30%
+        if (income <= 500000)  return 0;
+        if (income <= 1000000) return (income - 500000) * 0.20;
+        return 100000 + (income - 1000000) * 0.30;
+
+      case "Senior":
+        // Exempt up to ₹3,00,000 | 3L–5L @5% | 5L–10L @20% | >10L @30%
+        if (income <= 300000)  return 0;
+        if (income <= 500000)  return (income - 300000) * 0.05;
+        if (income <= 1000000) return 10000 + (income - 500000) * 0.20;
+        return 110000 + (income - 1000000) * 0.30;
+
+      default:
+        // Male / Female — Exempt up to ₹2,50,000 | 2.5L–5L @5% | 5L–10L @20% | >10L @30%
+        if (income <= 250000)  return 0;
+        if (income <= 500000)  return (income - 250000) * 0.05;
+        if (income <= 1000000) return 12500 + (income - 500000) * 0.20;
+        return 112500 + (income - 1000000) * 0.30;
+    }
+  }
+
+  /* ── 2. Surcharge rate for Individual/HUF ───────────────────────────────── */
+  function getSurchargeRate(income) {
+    if (income > 50000000) return 0.37;   // > ₹5 Cr
+    if (income > 20000000) return 0.25;   // > ₹2 Cr
+    if (income > 10000000) return 0.15;   // > ₹1 Cr
+    if (income >  5000000) return 0.10;   // > ₹50 L
+    return 0;
+  }
+
+  /* ── 3. Surcharge threshold map ─────────────────────────────────────────── */
+  const THRESHOLDS = [50000000, 20000000, 10000000, 5000000];
+
+  function getThreshold(income) {
+    return THRESHOLDS.find(t => income > t) || 0;
+  }
+
+  /* ── 4. Marginal Relief ─────────────────────────────────────────────────── */
+  //  Ensures: (Tax + Surcharge) ≤ (Tax at threshold + income excess over threshold)
+  function applyMarginalRelief(tax, income, gender, taxpayer) {
+    const rate      = getSurchargeRate(income);
+    if (rate === 0) return 0;
+
+    const threshold    = getThreshold(income);
+    const normalS      = tax * rate;
+
+    // Tax at the threshold level
+    const taxAtThresh  = taxpayer === "Firm"
+      ? threshold * 0.30
+      : slabTax(threshold, gender);
+
+    const maxAllowedS  = taxAtThresh + (income - threshold) - tax;
+    return Math.max(0, Math.min(normalS, maxAllowedS));
+  }
+
+  /* ── 5. Main Calculation ────────────────────────────────────────────────── */
+  function calculate() {
+    const raw      = document.getElementById("income").value.trim();
+    const income   = parseFloat(raw);
+    const errDiv   = document.getElementById("errMsg");
+    const outputs  = ["outTax","outSurcharge","outCess","outTotal"];
+    const clear    = () => outputs.forEach(id => document.getElementById(id).value = "");
+
+    if (raw === "" || isNaN(income)) { errDiv.style.display = "none"; clear(); return; }
+    if (income < 0)                  { errDiv.style.display = "block"; clear(); return; }
+    errDiv.style.display = "none";
+
+    const gender   = document.getElementById("gender").value;
+    const taxpayer = document.getElementById("taxpayer").value;
+    const isNRI    = document.getElementById("resstatus").value === "NRI";
+
+    let tax = 0, surcharge = 0;
+
+    if (taxpayer === "Firm") {
+      /* Firm / LLP — Flat 30%, Surcharge 12% if income > ₹1 Cr (with marginal relief) */
+      tax       = income * 0.30;
+      surcharge = income > 10000000 ? applyMarginalRelief(tax, income, gender, "Firm") : 0;
+      // Note: Firms also have 12% surcharge; handled inside applyMarginalRelief via getSurchargeRate
+      // Override: firm surcharge is fixed 12%
+      if (income > 10000000) {
+        const normalS     = tax * 0.12;
+        const taxAt1Cr    = 10000000 * 0.30;
+        const maxS        = taxAt1Cr + (income - 10000000) - tax;
+        surcharge         = Math.max(0, Math.min(normalS, maxS));
+      }
+    } else {
+      /* Individual / HUF — NRI uses Male slab (no age-based exemption benefit) */
+      const effectiveGender = isNRI ? "Male" : gender;
+      tax = slabTax(income, effectiveGender);
+
+      /* Rebate u/s 87A: Resident Individual only, income ≤ ₹5L, max rebate ₹12,500 */
+      if (!isNRI && taxpayer === "Individual" && income <= 500000)
+        tax = Math.max(0, tax - 12500);
+
+      surcharge = applyMarginalRelief(tax, income, effectiveGender, taxpayer);
+    }
+
+    const cess  = (tax + surcharge) * 0.04;
+    const total = tax + surcharge + cess;
+
+    /* Format as Indian locale ₹ */
+    const fmt = v => "₹ " + v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById("outTax").value       = fmt(tax);
+    document.getElementById("outSurcharge").value = fmt(surcharge);
+    document.getElementById("outCess").value      = fmt(cess);
+    document.getElementById("outTotal").value     = fmt(total);
+  }
+
+  /* ── 6. Reset ───────────────────────────────────────────────────────────── */
+  function resetAll() {
+    document.getElementById("income").value = "";
+    document.getElementById("errMsg").style.display = "none";
+    ["outTax","outSurcharge","outCess","outTotal"].forEach(id =>
+      document.getElementById(id).value = "");
+  }
+
+  /* ── 7. Tab switch (visual only) ─────────────────────────────────────────*/
+  function switchTab(el) {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    el.classList.add("active");
+  }
+</script>
+</body>
+</html>
