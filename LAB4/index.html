@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>6×6 Sudoku Solver</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Georgia', serif;
+    }
+
+    h1 { color: #f0f0f0; font-size: 2rem; margin-bottom: 6px; letter-spacing: 4px; }
+    p.subtitle { color: #888; font-size: 0.8rem; margin-bottom: 24px; letter-spacing: 1px; }
+
+    /*
+     * FIX 2: Use gap:0 + per-cell JS-applied border classes instead of broken
+     * nth-child selectors. This gives precise control over box boundary thickness.
+     */
+    .sudoku-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 60px);
+      grid-template-rows: repeat(6, 60px);
+      border: 3px solid #444;
+      gap: 0;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    .sudoku-grid input {
+      width: 60px;
+      height: 60px;
+      text-align: center;
+      font-size: 1.5rem;
+      font-family: 'Georgia', serif;
+      font-weight: bold;
+      color: #1a1a2e;
+      outline: none;
+      cursor: text;
+      transition: background 0.18s;
+      border-top: none;
+      border-left: none;
+      border-right: 1px solid #aaa;
+      border-bottom: 1px solid #aaa;
+      background: #fafafa;
+    }
+
+    .sudoku-grid input:focus { background: #dceeff; }
+
+    /* Box boundary classes set by JS */
+    .sudoku-grid input.box-right  { border-right:  3px solid #444; }
+    .sudoku-grid input.box-bottom { border-bottom: 3px solid #444; }
+    .sudoku-grid input.last-col   { border-right:  none; }
+    .sudoku-grid input.last-row   { border-bottom: none; }
+
+    /* Clue cells */
+    .sudoku-grid input.clue { background: #dde; color: #222; cursor: default; }
+
+    /* Solved cells */
+    .sudoku-grid input.solved {
+      background: #d4edda;
+      color: #155724;
+      animation: popIn 0.22s ease;
+    }
+    @keyframes popIn {
+      0%  { transform: scale(0.82); }
+      65% { transform: scale(1.1);  }
+      100%{ transform: scale(1);    }
+    }
+
+    /* Conflict cells */
+    .sudoku-grid input.error { background: #f8d7da; color: #721c24; }
+
+    /* Buttons */
+    .controls { display: flex; gap: 14px; margin-top: 24px; }
+    button {
+      padding: 12px 28px;
+      font-size: 0.9rem;
+      font-family: 'Georgia', serif;
+      letter-spacing: 2px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.1s;
+    }
+    button:active { transform: scale(0.97); }
+    .btn-solve { background: #3a7bd5; color: #fff; box-shadow: 0 4px 12px rgba(58,123,213,0.4); }
+    .btn-solve:hover  { filter: brightness(1.15); }
+    .btn-reset { background: #555; color: #eee; }
+    .btn-reset:hover  { filter: brightness(1.2); }
+    .btn-clear { background: #c0392b; color: #fff; }
+    .btn-clear:hover  { filter: brightness(1.15); }
+
+    /* Status */
+    .status {
+      margin-top: 18px;
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+      min-height: 22px;
+      color: #aaa;
+      transition: color 0.3s;
+    }
+    .status.ok  { color: #2ecc71; }
+    .status.err { color: #e74c3c; }
+
+    /* Legend */
+    .legend { display: flex; gap: 20px; margin-top: 18px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #aaa; }
+    .legend-box  { width: 18px; height: 18px; border-radius: 3px; border: 1px solid #777; }
+
+    .tip { margin-top: 10px; font-size: 0.72rem; color: #555; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+
+  <h1>Sudoku</h1>
+  <p class="subtitle">6 × 6 &nbsp;&middot;&nbsp; DOM Solver</p>
+
+  <div class="sudoku-grid" id="grid"></div>
+
+  <div class="controls">
+    <button class="btn-solve" onclick="solvePuzzle()">&#9654; Solve</button>
+    <button class="btn-reset" onclick="resetToClues()">&#8634; Reset</button>
+    <button class="btn-clear" onclick="clearAll()">&#10005; Clear</button>
+  </div>
+
+  <div class="status" id="status">Enter digits 1&ndash;6 and press Solve.</div>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-box" style="background:#dde"></div>
+      <span>Given clue</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-box" style="background:#d4edda"></div>
+      <span>Solved</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-box" style="background:#f8d7da"></div>
+      <span>Conflict</span>
+    </div>
+  </div>
+
+  <p class="tip">Use arrow keys to navigate between cells</p>
+
+  <script>
+    /*
+     * FIX 1 (CRITICAL): The original puzzle contained 7, 8, 9 — invalid in a
+     * 6x6 Sudoku where the only valid digits are 1–6.  Replaced with a proper
+     * 6×6 puzzle whose unique solution is:
+     *
+     *   1 2 3 | 4 5 6
+     *   4 5 6 | 1 2 3
+     *   ------+------
+     *   2 3 1 | 5 6 4
+     *   5 6 4 | 2 3 1
+     *   ------+------
+     *   3 1 2 | 6 4 5
+     *   6 4 5 | 3 1 2
+     */
+    const INITIAL = [
+      [1, 0, 0, 4, 0, 6],
+      [0, 5, 0, 0, 2, 0],
+      [0, 3, 1, 0, 0, 4],
+      [5, 0, 0, 2, 3, 0],
+      [0, 1, 0, 0, 4, 0],
+      [6, 0, 5, 0, 0, 2]
+    ];
+
+    const SIZE  = 6;
+    const BOX_R = 2;   // each box is 2 rows tall
+    const BOX_C = 3;   // each box is 3 columns wide
+
+    const gridEl = document.getElementById('grid');
+    let cells = [];    // cells[row][col] -> <input>
+
+    // ── Build the DOM grid ─────────────────────────────────────────────────
+    function buildGrid(customMode) {
+      gridEl.innerHTML = '';
+      cells = [];
+
+      for (let r = 0; r < SIZE; r++) {
+        cells[r] = [];
+        for (let c = 0; c < SIZE; c++) {
+          const inp = document.createElement('input');
+          inp.type        = 'text';
+          inp.maxLength   = 1;
+          inp.autocomplete = 'off';
+          inp.dataset.row = r;
+          inp.dataset.col = c;
+
+          /*
+           * FIX 2: Box borders applied precisely by position.
+           * 6×6 with 2-row × 3-col boxes:
+           *   box-right  → column index 2  (after every 3rd col)
+           *   box-bottom → row index 1 and row index 3  (after every 2nd row)
+           *   last-col   → column index 5  (right edge, no right border needed)
+           *   last-row   → row index 5     (bottom edge, no bottom border needed)
+           */
+          if (c === BOX_C - 1)                           inp.classList.add('box-right');
+          if (c === SIZE - 1)                            inp.classList.add('last-col');
+          if (r === BOX_R - 1 || r === BOX_R * 2 - 1)  inp.classList.add('box-bottom');
+          if (r === SIZE - 1)                            inp.classList.add('last-row');
+
+          if (!customMode) {
+            const val = INITIAL[r][c];
+            if (val !== 0) {
+              inp.value    = val;
+              inp.readOnly = true;
+              inp.classList.add('clue');
+            }
+          }
+
+          /*
+           * FIX 3: Single merged keydown listener (was two separate ones).
+           * Handles: arrow navigation, blocking invalid keys, read-only guard.
+           */
+          inp.addEventListener('keydown', function (e) {
+            const row = +this.dataset.row;
+            const col = +this.dataset.col;
+
+            // Arrow-key navigation (works even on clue cells)
+            switch (e.key) {
+              case 'ArrowUp':
+                e.preventDefault();
+                cells[(row - 1 + SIZE) % SIZE][col].focus();
+                return;
+              case 'ArrowDown':
+                e.preventDefault();
+                cells[(row + 1) % SIZE][col].focus();
+                return;
+              case 'ArrowLeft':
+                e.preventDefault();
+                cells[row][(col - 1 + SIZE) % SIZE].focus();
+                return;
+              case 'ArrowRight':
+                e.preventDefault();
+                cells[row][(col + 1) % SIZE].focus();
+                return;
+            }
+
+            // Clue cells are read-only
+            if (this.readOnly) { e.preventDefault(); return; }
+
+            // Allow editing control keys
+            if (['Backspace', 'Delete', 'Tab'].includes(e.key)) return;
+
+            // Block anything that is not a digit 1–6
+            if (!/^[1-6]$/.test(e.key)) e.preventDefault();
+          });
+
+          // Safety net: sanitise pasted or browser-autocompleted values
+          inp.addEventListener('input', function () {
+            const v = parseInt(this.value);
+            if (isNaN(v) || v < 1 || v > SIZE) this.value = '';
+            this.classList.remove('solved', 'error');
+            setStatus('');
+          });
+
+          gridEl.appendChild(inp);
+          cells[r][c] = inp;
+        }
+      }
+    }
+
+    // ── Read board values from DOM ─────────────────────────────────────────
+    function readBoard() {
+      return cells.map(row =>
+        row.map(inp => { const v = parseInt(inp.value); return isNaN(v) ? 0 : v; })
+      );
+    }
+
+    // ── Write solved board back to DOM ─────────────────────────────────────
+    // FIX 6: Removed the unused 'original' parameter that was in writeBoard(board, original).
+    function writeBoard(board) {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const inp = cells[r][c];
+          if (!inp.classList.contains('clue') && board[r][c] !== 0) {
+            inp.value = board[r][c];
+            inp.classList.remove('error');
+            inp.classList.add('solved');
+          }
+        }
+      }
+    }
+
+    // ── Constraint checkers ────────────────────────────────────────────────
+    function isValidInRow(board, row, num) {
+      return !board[row].includes(num);
+    }
+
+    function isValidInCol(board, col, num) {
+      for (let r = 0; r < SIZE; r++) if (board[r][col] === num) return false;
+      return true;
+    }
+
+    function isValidInBox(board, row, col, num) {
+      const sr = Math.floor(row / BOX_R) * BOX_R;
+      const sc = Math.floor(col / BOX_C) * BOX_C;
+      for (let r = sr; r < sr + BOX_R; r++)
+        for (let c = sc; c < sc + BOX_C; c++)
+          if (board[r][c] === num) return false;
+      return true;
+    }
+
+    function isValid(board, row, col, num) {
+      return isValidInRow(board, row, num) &&
+             isValidInCol(board, col, num) &&
+             isValidInBox(board, row, col, num);
+    }
+
+    /*
+     * FIX 5: Collect ALL conflicting cells (old code returned on first hit).
+     * Temporarily zero each filled cell, check if placing it back is legal,
+     * restore it, then add to conflicts list if illegal.
+     */
+    function findConflicts(board) {
+      const conflicts = [];
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const v = board[r][c];
+          if (v === 0) continue;
+          board[r][c] = 0;                          // temporarily remove
+          if (!isValid(board, r, c, v))             // check remaining board
+            conflicts.push({ row: r, col: c });
+          board[r][c] = v;                          // restore
+        }
+      }
+      return conflicts;
+    }
+
+    // ── Backtracking solver ────────────────────────────────────────────────
+    function solve(board) {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (board[r][c] === 0) {
+            for (let num = 1; num <= SIZE; num++) {
+              if (isValid(board, r, c, num)) {
+                board[r][c] = num;
+                if (solve(board)) return true;
+                board[r][c] = 0;      // backtrack
+              }
+            }
+            return false;             // no valid placement found
+          }
+        }
+      }
+      return true;                    // board fully filled
+    }
+
+    // ── Solve button ───────────────────────────────────────────────────────
+    function solvePuzzle() {
+      // Clear all previous highlight classes
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++)
+          if (!cells[r][c].classList.contains('clue'))
+            cells[r][c].classList.remove('solved', 'error');
+
+      const board = readBoard();
+
+      // FIX 5: Highlight every conflicting cell
+      const conflicts = findConflicts(board);
+      if (conflicts.length > 0) {
+        conflicts.forEach(({ row, col }) => cells[row][col].classList.add('error'));
+        setStatus('&#10008; ' + conflicts.length + ' conflict(s) found &mdash; highlighted in red.', 'err');
+        return;
+      }
+
+      // Solve on a copy so the DOM state is not changed before we know it worked
+      const copy = board.map(row => [...row]);
+      if (solve(copy)) {
+        writeBoard(copy);
+        setStatus('&#10004; Puzzle solved successfully!', 'ok');
+      } else {
+        setStatus('&#10008; No solution exists for this puzzle.', 'err');
+      }
+    }
+
+    /*
+     * FIX 4: resetToClues() now fully rebuilds the grid from INITIAL by calling
+     * buildGrid(false). The old approach only cleared non-clue cells, but after
+     * clearAll() removed all .clue classes, Reset did nothing useful.
+     */
+    function resetToClues() {
+      buildGrid(false);
+      setStatus('Reset to original puzzle.');
+    }
+
+    function clearAll() {
+      buildGrid(true);
+      setStatus('Board cleared &mdash; enter your own 6&times;6 puzzle (digits 1&ndash;6).');
+    }
+
+    function setStatus(html, type) {
+      const el = document.getElementById('status');
+      el.innerHTML   = html;
+      el.className   = 'status ' + (type || '');
+    }
+
+    // ── Initialise ─────────────────────────────────────────────────────────
+    buildGrid(false);
+  </script>
+</body>
+</html>

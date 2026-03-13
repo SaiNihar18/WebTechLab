@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Calculator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #2b2b2b;
+      font-family: 'Courier New', monospace;
+    }
+
+    .calc-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    h1 {
+      color: #ccc;
+      font-size: 1rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+
+    .calculator {
+      background: #c0c0c0;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow:
+        4px 4px 10px rgba(0,0,0,0.5),
+        -2px -2px 6px rgba(255,255,255,0.3);
+      width: 280px;
+    }
+
+    /* ── Display ── */
+    .display-area {
+      background: #9db890;
+      border: 3px inset #888;
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      text-align: right;
+      box-shadow: inset 2px 2px 6px rgba(0,0,0,0.4);
+    }
+
+    .display-expr {
+      font-size: 0.75rem;
+      color: #4a6045;
+      min-height: 16px;
+      word-break: break-all;
+      opacity: 0.8;
+    }
+
+    .display-main {
+      font-size: 2rem;
+      color: #1a2e1a;
+      font-weight: bold;
+      word-break: break-all;
+      letter-spacing: 1px;
+    }
+
+    /* ── Button grid ── */
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    button {
+      padding: 14px 0;
+      font-size: 1rem;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      outline: none;
+      transition: filter 0.1s;
+
+      /* Raised 3D effect */
+      box-shadow:
+        2px 2px 4px rgba(0,0,0,0.35),
+        -1px -1px 3px rgba(255,255,255,0.6);
+    }
+
+    button:active {
+      box-shadow:
+        inset 2px 2px 4px rgba(0,0,0,0.3),
+        inset -1px -1px 3px rgba(255,255,255,0.4);
+      filter: brightness(0.92);
+    }
+
+    /* Number buttons */
+    .btn-num {
+      background: #e0e0e0;
+      color: #222;
+    }
+    .btn-num:hover { background: #ececec; }
+
+    /* Operator buttons */
+    .btn-op {
+      background: #b0b8c8;
+      color: #1a1a3a;
+    }
+    .btn-op:hover { background: #c0cad8; }
+
+    /* Equals */
+    .btn-eq {
+      background: #4a7cba;
+      color: #fff;
+    }
+    .btn-eq:hover { background: #5a8cca; }
+
+    /* Clear / CE */
+    .btn-clear {
+      background: #c04040;
+      color: #fff;
+    }
+    .btn-clear:hover { background: #d05050; }
+
+    /* Paren */
+    .btn-paren {
+      background: #a0a8b0;
+      color: #222;
+    }
+    .btn-paren:hover { background: #b0b8c0; }
+
+    /* Error shake */
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%,60%  { transform: translateX(-6px); }
+      40%,80%  { transform: translateX(6px); }
+    }
+    .shake { animation: shake 0.35s; }
+  </style>
+</head>
+<body>
+
+  <div class="calc-wrapper">
+    <h1>Calculator</h1>
+    <div class="calculator">
+      <!-- Display -->
+      <div class="display-area">
+        <div class="display-expr" id="expr"></div>
+        <div class="display-main" id="display">0</div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="btn-grid">
+        <!-- Row 1 -->
+        <button class="btn-paren" onclick="inputChar('(')">(</button>
+        <button class="btn-clear"  onclick="clearEntry()">CE</button>
+        <button class="btn-paren" onclick="inputChar(')')">)</button>
+        <button class="btn-clear"  onclick="clearAll()">C</button>
+
+        <!-- Row 2 -->
+        <button class="btn-num"  onclick="inputChar('1')">1</button>
+        <button class="btn-num"  onclick="inputChar('2')">2</button>
+        <button class="btn-num"  onclick="inputChar('3')">3</button>
+        <button class="btn-op"   onclick="inputChar('+')">+</button>
+
+        <!-- Row 3 -->
+        <button class="btn-num"  onclick="inputChar('4')">4</button>
+        <button class="btn-num"  onclick="inputChar('5')">5</button>
+        <button class="btn-num"  onclick="inputChar('6')">6</button>
+        <button class="btn-op"   onclick="inputChar('-')">−</button>
+
+        <!-- Row 4 -->
+        <button class="btn-num"  onclick="inputChar('7')">7</button>
+        <button class="btn-num"  onclick="inputChar('8')">8</button>
+        <button class="btn-num"  onclick="inputChar('9')">9</button>
+        <button class="btn-op"   onclick="inputChar('*')">×</button>
+
+        <!-- Row 5 -->
+        <button class="btn-num"  onclick="inputChar('.')">.</button>
+        <button class="btn-num"  onclick="inputChar('0')">0</button>
+        <button class="btn-eq"   onclick="calculate()">=</button>
+        <button class="btn-op"   onclick="inputChar('/')">÷</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let expression = '';
+    let justCalculated = false;
+
+    const displayEl = document.getElementById('display');
+    const exprEl    = document.getElementById('expr');
+
+    function updateDisplay(val) {
+      displayEl.textContent = val === '' ? '0' : val;
+    }
+
+    function inputChar(ch) {
+      const ops = ['+', '-', '*', '/'];
+
+      // After = is pressed, start fresh for operators, or clear for digits
+      if (justCalculated) {
+        if (ops.includes(ch)) {
+          // Continue with result
+          expression = displayEl.textContent + ch;
+        } else {
+          expression = ch;
+        }
+        justCalculated = false;
+        exprEl.textContent = '';
+        updateDisplay(expression);
+        return;
+      }
+
+      // Prevent double operators
+      if (ops.includes(ch) && expression.length > 0 && ops.includes(expression.slice(-1))) {
+        expression = expression.slice(0, -1) + ch;
+      } else {
+        expression += ch;
+      }
+
+      updateDisplay(expression);
+    }
+
+    function clearEntry() {
+      // Remove last character
+      expression = expression.slice(0, -1);
+      justCalculated = false;
+      updateDisplay(expression);
+    }
+
+    function clearAll() {
+      expression = '';
+      justCalculated = false;
+      exprEl.textContent = '';
+      updateDisplay('0');
+    }
+
+    function calculate() {
+      if (expression === '') return;
+
+      exprEl.textContent = expression + ' =';
+
+      try {
+        // Replace × and ÷ display chars (just in case)
+        let evalExpr = expression
+          .replace(/×/g, '*')
+          .replace(/÷/g, '/')
+          .replace(/−/g, '-');
+
+        // Security: only allow safe characters
+        if (/[^0-9+\-*/().\s]/.test(evalExpr)) throw new Error('Invalid');
+
+        // eslint-disable-next-line no-new-func
+        let result = Function('"use strict"; return (' + evalExpr + ')')();
+
+        if (!isFinite(result)) throw new Error('Cannot divide by zero');
+
+        // Round to avoid floating point weirdness
+        result = parseFloat(result.toFixed(10));
+
+        expression = String(result);
+        updateDisplay(expression);
+        justCalculated = true;
+
+      } catch (err) {
+        displayEl.textContent = err.message === 'Cannot divide by zero' ? 'Div/0 Error' : 'Error';
+        displayEl.classList.add('shake');
+        setTimeout(() => displayEl.classList.remove('shake'), 400);
+        expression = '';
+        justCalculated = false;
+        exprEl.textContent = '';
+      }
+    }
+
+    // Keyboard support
+    document.addEventListener('keydown', e => {
+      if (e.key >= '0' && e.key <= '9') inputChar(e.key);
+      else if (['+', '-', '*', '/', '(', ')'].includes(e.key)) inputChar(e.key);
+      else if (e.key === '.') inputChar('.');
+      else if (e.key === 'Enter' || e.key === '=') calculate();
+      else if (e.key === 'Backspace') clearEntry();
+      else if (e.key === 'Escape') clearAll();
+    });
+  </script>
+</body>
+</html>
